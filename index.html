@@ -63,7 +63,13 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 .drop-zone::-webkit-scrollbar-thumb{background:var(--blue-m);border-radius:3px;}
 .drop-zone:hover,.drop-zone.over{border-color:var(--blue);background:var(--blue-l);transform:translateY(-3px);box-shadow:var(--sh-lg);}
 .dz-icon{width:60px;height:60px;background:var(--blue-l);border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:26px;margin:0 auto 16px;box-shadow:0 0 0 8px rgba(59,110,248,.07);}
-.dz-title{font-size:17px;font-weight:700;margin-bottom:6px;}
+.dz-title{font-size:17px;font-weight:700;margin-bottom:12px;}
+.dz-file-list{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:10px;}
+.dz-file-tag{display:inline-flex;align-items:center;gap:5px;background:#eef3ff;border:1px solid #d6e0f5;border-radius:20px;padding:4px 10px 4px 8px;font-size:12px;color:#1a2c5b;max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dz-file-tag svg{flex-shrink:0;stroke:#3b6ef8;}
+.dz-file-tag button{background:none;border:none;color:#8a94b0;font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0;}
+.dz-file-tag button:hover{color:#dc3155;}
+.dz-file-more{display:inline-flex;align-items:center;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:#3b6ef8;background:#eef3ff;border:1px dashed #3b6ef8;}
 .dz-hint{font-size:13px;color:var(--text3);}
 .dz-hint b{color:var(--blue);cursor:pointer;}
 #file-input{display:none;}
@@ -677,12 +683,16 @@ function renderFileList(){
   const list=document.getElementById('dz-file-list');
   const goBtn=document.getElementById('dz-go-btn');
   if(!pendingFiles.length){list.innerHTML='';goBtn.style.display='none';return;}
-  list.innerHTML=pendingFiles.map(f=>`
+  const maxShow=3;
+  const visible=pendingFiles.slice(0,maxShow);
+  const extra=pendingFiles.length-maxShow;
+  list.innerHTML=visible.map(f=>`
     <span class="dz-file-tag">
       <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" width="12" height="12" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V5z"/><polyline points="8 1 8 5 12 5"/></svg>
       ${f.name.replace(/\.xlsx?$/i,'')}
       <button onclick="event.stopPropagation();removeFile('${f.name}')" title="Remove">×</button>
-    </span>`).join('');
+    </span>`).join('')+
+    (extra>0?`<span class="dz-file-more">+${extra} more</span>`:'');
   goBtn.style.display='inline-flex';goBtn.style.marginTop='18px';
 }
 
