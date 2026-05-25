@@ -132,9 +132,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 .btn-ghost{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);border:1.5px solid rgba(255,255,255,.22);}
 .btn-ghost:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4);color:#fff;}
 .btn-ghost.active{background:var(--blue);border-color:var(--blue);color:#fff;}
-#top10-btn{background:var(--surface);border-color:var(--border2);color:var(--text2);}
-#top10-btn:hover{background:var(--surface2);border-color:var(--blue);color:var(--blue);}
-#top10-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
 .pdf-menu{display:none;position:absolute;top:100%;right:108px;background:#fff;border:1px solid var(--border2);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:200;overflow:hidden;min-width:160px;}
 .pdf-menu button{display:block;width:100%;padding:10px 18px;font-family:var(--sans);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;text-align:left;color:var(--text);transition:background .12s;}
 .pdf-menu button:hover{background:var(--blue-l);color:var(--blue);}
@@ -151,6 +148,8 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 /* ── FILTER BAR ── */
 .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
 .filter-lbl{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
+#top-n-sel.active{border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 3px rgba(59,110,248,.12);}
+#top-n-custom.active{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,110,248,.12);}
 .filter-group{display:flex;align-items:center;gap:8px;}
 .fselect-wrap{position:relative;display:inline-flex;align-items:center;}
 .fselect-wrap svg{position:absolute;right:10px;pointer-events:none;color:var(--text3);}
@@ -584,7 +583,7 @@ tbody tr:hover td{background:var(--blue-l);}
       </div>
     </div>
     <div class="hdr-r" style="position:relative">
-      <button class="btn btn-pdf" onclick="top10Active?exportPDF('student'):showPdfMenu(event)">
+      <button class="btn btn-pdf" onclick="topN>0?exportPDF('student'):showPdfMenu(event)">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg>
         <span>Export PDF</span>
       </button>
@@ -840,7 +839,7 @@ function fmt(n){return Number(n).toLocaleString();}
 
 // ── Filters ──
 let activeCampus='all';
-let top10Active=false;
+let topN=0;
 
 function buildFilters(){
   const grades=[...new Set(clsD.map(c=>c.grade))].sort((a,b)=>+a-+b);
@@ -890,15 +889,30 @@ function buildFilters(){
     activeCampus='all';
   }
 
-  // ── Top 10 toggle ──
+  // ── Top N selector ──
   const sep2=document.createElement('span');
   sep2.style.cssText='width:1px;height:22px;background:var(--border2);flex-shrink:0;';
   fb.appendChild(sep2);
-  const t10=document.createElement('button');t10.className='btn btn-ghost';t10.id='top10-btn';
-  t10.style.cssText='font-size:12px;padding:5px 12px;border-radius:20px;white-space:nowrap;';
-  t10.innerHTML='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><polyline points="4 11 8 7 12 11"/></svg> Top 10 Students';
-  t10.onclick=()=>{top10Active=!top10Active;t10.classList.toggle('active',top10Active);render(document.getElementById('grade-select')?.value||'all');};
-  fb.appendChild(t10);
+  const topWrap=document.createElement('span');
+  topWrap.style.cssText='display:inline-flex;align-items:center;gap:4px;';
+  const topSel=document.createElement('select');topSel.id='top-n-sel';
+  topSel.style.cssText='font-family:var(--sans);font-size:12px;font-weight:600;padding:5px 22px 5px 10px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 16 16\'%3E%3Cpolyline points=\'4 6 8 10 12 6\' fill=\'none\' stroke=\'%238890a8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;';
+  const offOpt=document.createElement('option');offOpt.value='0';offOpt.selected=true;offOpt.textContent='Select Top Students';topSel.appendChild(offOpt);
+  [10,20,30,40,50].forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent='Top '+n;topSel.appendChild(o);});
+  const oc=document.createElement('option');oc.value='custom';oc.textContent='Custom…';topSel.appendChild(oc);
+  topSel.value='0';
+  topSel.onchange=()=>{
+    const v=topSel.value;
+    if(v==='custom'){topCustom.style.display='';topCustom.focus();return;}
+    topCustom.style.display='none';
+    topN=+v;render(document.getElementById('grade-select')?.value||'all');
+  };
+  const topCustom=document.createElement('input');topCustom.id='top-n-custom';topCustom.type='number';topCustom.min=1;topCustom.max=999;topCustom.placeholder='N';
+  topCustom.style.cssText='width:48px;font-family:var(--sans);font-size:12px;font-weight:600;padding:5px 8px;border-radius:20px;border:1.5px solid var(--blue);background:var(--surface);color:var(--text);outline:none;display:none;text-align:center;';
+  topCustom.onkeydown=e=>{if(e.key==='Enter'){const v=parseInt(topCustom.value);if(v>0){topN=v;render(document.getElementById('grade-select')?.value||'all');}}};
+  topCustom.onblur=()=>{const v=parseInt(topCustom.value);if(v>0){topN=v;render(document.getElementById('grade-select')?.value||'all');}};
+  topWrap.appendChild(topSel);topWrap.appendChild(topCustom);
+  fb.appendChild(topWrap);
 }
 
 // ── Render ──
@@ -908,16 +922,18 @@ function render(grade){
   const byGradeS=grade==='all'?allS:allS.filter(s=>s.grade===grade);
   let fs=activeCampus==='all'?byGradeS:byGradeS.filter(s=>s.campus===activeCampus);
   let top10Classes=[];
-  if(top10Active){
+  document.getElementById('top-n-sel').classList.toggle('active',topN>0);
+  document.getElementById('top-n-custom').classList.toggle('active',topN>0&&document.getElementById('top-n-sel').value==='custom');
+  if(topN>0){
     const fsScore=[...fs].filter(s=>s.score>0).sort((a,b)=>b.score-a.score||b.logins-a.logins);
     const fsNoScore=[...fs].filter(s=>s.score===0).sort((a,b)=>b.logins-a.logins);
-    fs=fsScore.concat(fsNoScore).slice(0,10);
+    fs=fsScore.concat(fsNoScore).slice(0,topN);
     top10Classes=fs.map(s=>s.class);
     fc=fc.filter(c=>top10Classes.includes(c.class));
   }
-  document.getElementById('kpi-grid').style.display=top10Active?'none':'';
-  document.querySelector('.charts-grid').style.display=top10Active?'none':'';
-  document.getElementById('class-section').style.display=top10Active?'none':'';
+  document.getElementById('kpi-grid').style.display=topN>0?'none':'';
+  document.querySelector('.charts-grid').style.display=topN>0?'none':'';
+  document.getElementById('class-section').style.display=topN>0?'none':'';
   const tS=fs.length, tA=fs.filter(s=>s.logins>0).length;
   const tL=fs.reduce((a,s)=>a+s.logins,0);
   const tE=fs.reduce((a,s)=>a+s.ebooks,0);
@@ -1024,7 +1040,7 @@ function filterClassTable(){
 }
 
 function renderStudentTbl(ss){
-  document.getElementById('student-ct').textContent=fmt(ss.length)+' students'+(top10Active?' (top 10)':'');
+  document.getElementById('student-ct').textContent=fmt(ss.length)+' students'+(topN>0?' (top '+topN+')':'');
   document.getElementById('srch').value='';
   statusFilter='all';
   document.querySelectorAll('#status-filters .status-pill').forEach(p=>p.classList.toggle('active',p.dataset.status==='all'));
@@ -1393,10 +1409,10 @@ async function exportPDF(mode){
     const pw=pdf.internal.pageSize.getWidth();
     const ph=pdf.internal.pageSize.getHeight();
     const dt=new Date().toLocaleDateString('en-GB');
-    const suffix=(top10Active?'-top10':mode==='student'?'-student-report':(grade==='all'?'-all-grades':'-grade-'+grade));
+    const suffix=(topN>0?'-top'+topN:mode==='student'?'-student-report':(grade==='all'?'-all-grades':'-grade-'+grade));
     let filename=uploadedFileName+suffix;
 
-    if(top10Active||mode==='student'){
+    if(topN>0||mode==='student'){
       await captureStudentReport(pdf,grade,pw,ph,msg);
     }else{
       await captureGrade(pdf,grade,pw,ph,true,msg);
@@ -1441,8 +1457,8 @@ function vis(id){
 }
 
 function resetTool(){
-  allS=[];clsD=[];pendingFiles=[];activeCampus='all';top10Active=false;
-  const tb=document.getElementById('top10-btn');if(tb)tb.classList.remove('active');
+  allS=[];clsD=[];pendingFiles=[];activeCampus='all';topN=0;
+  document.getElementById('top-n-sel').value='10';document.getElementById('top-n-custom').style.display='none';
   Object.values(charts).forEach(c=>c.destroy());charts={};
   document.getElementById('file-input').value='';
   renderFileList();
