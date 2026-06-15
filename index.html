@@ -492,12 +492,18 @@ tbody tr:hover td{background:var(--blue-l);}
       <div class="upload-header-sep"></div>
       <div class="upload-header-title">Oxford Reading Buddy - Data Analytics And Reporting Tool</div>
     </div>
+    <div style="display:flex;align-items:center;gap:10px">
+    <button class="btn btn-ghost" id="usage-btn-u" onclick="downloadUsage()" style="display:none">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg>
+      <span>Usage</span>
+    </button>
     <div class="user-badge-wrap" style="position:relative">
       <div class="user-badge" id="user-badge-upload" style="display:none" onclick="toggleUserMenu(event)">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span id="user-name-display-u"></span>
       </div>
       <div class="user-menu" id="user-menu-u"><button onclick="logout()">Logout</button></div>
+    </div>
     </div>
   </header>
 
@@ -669,6 +675,10 @@ function acceptCookies(){localStorage.setItem('orb_cookie_accepted','yes');docum
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 8a6 6 0 1 0 1-3.2M2 2v3h3"/></svg>
         <span>New file</span>
       </button>
+      <button class="btn btn-ghost" id="usage-btn" onclick="downloadUsage()" style="display:none">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg>
+        <span>Usage</span>
+      </button>
       <div class="user-badge-wrap" style="position:relative">
         <div class="user-badge" id="user-badge" onclick="toggleUserMenu(event)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -795,6 +805,19 @@ function checkLogin(){
   }
 }
 
+async function trackAction(action,meta){
+  if(!db) return;
+  try{
+    const user=localStorage.getItem('orb_user')||'unknown';
+    await db.collection('usage').add({
+      username:user,
+      action:action,
+      metadata:meta||'',
+      timestamp:firebase.firestore.FieldValue.serverTimestamp()
+    });
+  }catch(e){/* silent */};
+}
+
 function toggleUserMenu(e){
   e.stopPropagation();
   const wrap=e.currentTarget.closest('.user-badge-wrap');
@@ -819,6 +842,27 @@ function showUserBadge(name){
   if(u) u.textContent=name;
   const ub=document.getElementById('user-badge-upload');
   if(ub) ub.style.display='';
+  const ub2=document.getElementById('usage-btn');
+  if(ub2) ub2.style.display=localStorage.getItem('orb_user')==='admin'?'':'none';
+  const ub3=document.getElementById('usage-btn-u');
+  if(ub3) ub3.style.display=localStorage.getItem('orb_user')==='admin'?'':'none';
+}
+
+async function downloadUsage(){
+  if(!db){alert('Firestore not available.');return;}
+  try{
+    const snap=await db.collection('usage').orderBy('timestamp','desc').get();
+    const rows=[['Username','Action','Metadata','Timestamp']];
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const ts=d.timestamp?new Date(d.timestamp.toMillis()).toLocaleString():'';
+      rows.push([d.username||'',d.action||'',d.metadata||'',ts]);
+    });
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb,ws,'Usage');
+    XLSX.writeFile(wb,'usage-report.xlsx');
+  }catch(e){alert('Error downloading usage report.');console.error(e);}
 }
 
 function togglePass(){
@@ -842,10 +886,15 @@ async function doLogin(){
   // Check hardcoded admin first
   if(u===ADMIN_USER&&p===ADMIN_PASS){
     localStorage.setItem('orb_logged_in','yes');
-    localStorage.setItem('orb_user',u);
-    showUserBadge(u);
+    localStorage.setItem('orb_user','admin');
+    showUserBadge('admin');
     document.getElementById('login-overlay').classList.add('hidden');
-    btn.disabled=false;btn.classList.remove('loading');return;
+    btn.disabled=false;btn.classList.remove('loading');
+    ['usage-btn','usage-btn-u'].forEach(function(id){
+      const el=document.getElementById(id);
+      if(el) el.style.display='';
+    });
+    trackAction('login','admin');return;
   }
   // Check Firestore
   if(!db){err.textContent='Firestore not available.';btn.disabled=false;btn.classList.remove('loading');return;}
@@ -862,6 +911,7 @@ async function doLogin(){
       localStorage.setItem('orb_logged_in','yes');
       document.getElementById('login-overlay').classList.add('hidden');
       err.textContent='';
+      trackAction('login',u);
     }else{
       err.textContent='Invalid username or password.';
       document.getElementById('login-pass').value='';
@@ -916,7 +966,9 @@ async function goFiles(){
   vis('loading-screen');
   try{
     const results=await Promise.all(pendingFiles.map(f=>readFile(f)));
+    const fileCount=pendingFiles.length;
     parseAll(results);
+    trackAction('dashboard_generated',fileCount+' files');
   }catch(err){alert('Cannot read file: '+err.message);resetTool();}
 }
 
@@ -1623,6 +1675,7 @@ async function exportPDF(mode){
       pdf.text(`ORB Usage Dashboard · Generated ${dt} · Page ${i} of ${pages}`,pw/2,ph-3,{align:'center'});
     }
     pdf.save(`${filename}-${new Date().toISOString().slice(0,10)}.pdf`);
+    trackAction('report_generated',filename);
 
   }catch(err){
     console.error(err);
