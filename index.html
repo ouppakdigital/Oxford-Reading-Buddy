@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&family=DM+Serif+Display:ital@0;1&display=swap" rel="stylesheet">
 <style>
 :root {
@@ -139,6 +140,7 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 .btn{font-family:var(--sans);font-size:13px;font-weight:600;padding:7px 16px;border-radius:var(--r-sm);cursor:pointer;border:none;transition:all .15s;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;}
 .btn-ghost{background:rgba(255,255,255,.08);color:rgba(255,255,255,.85);border:1.5px solid rgba(255,255,255,.22);}
 .btn-ghost:hover{background:rgba(255,255,255,.16);border-color:rgba(255,255,255,.4);color:#fff;}
+.btn-ghost:disabled{opacity:.5;cursor:not-allowed;}
 .btn-ghost.active{background:var(--blue);border-color:var(--blue);color:#fff;}
 .pdf-menu{display:none;position:absolute;top:100%;right:108px;background:#fff;border:1px solid var(--border2);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.16);z-index:200;overflow:hidden;min-width:160px;}
 .pdf-menu button{display:block;width:100%;padding:10px 18px;font-family:var(--sans);font-size:13px;font-weight:600;border:none;background:none;cursor:pointer;text-align:left;color:var(--text);transition:background .12s;}
@@ -156,7 +158,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 /* ── FILTER BAR ── */
 .filter-bar{display:flex;align-items:center;gap:12px;margin-bottom:22px;flex-wrap:wrap;}
 .filter-lbl{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;}
-#top-n-sel.active{border-color:var(--blue);color:var(--blue);box-shadow:0 0 0 3px rgba(59,110,248,.12);}
 #top-n-custom.active{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,110,248,.12);}
 .filter-group{display:flex;align-items:center;gap:8px;}
 .fselect-wrap{position:relative;display:inline-flex;align-items:center;}
@@ -171,7 +172,37 @@ body{background:var(--bg);color:var(--text);font-family:var(--sans);-webkit-font
 }
 .fselect:hover{border-color:var(--blue);color:var(--blue);}
 .fselect:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,110,248,.12);}
-.fselect.active{border-color:var(--blue);color:var(--blue);box-shadow:0 2px 8px rgba(59,110,248,.22);}
+.fselect.active,.cselect.active .cselect-trigger{border-color:var(--blue);color:var(--blue);box-shadow:0 2px 8px rgba(59,110,248,.22);}
+
+/* ── Custom Select (screen-share friendly) ── */
+.cselect{position:relative;display:inline-flex;user-select:none;}
+.cselect-trigger{
+  font-family:var(--sans);font-size:13px;font-weight:600;
+  padding:7px 34px 7px 14px;border-radius:20px;
+  border:1.5px solid var(--border2);background:var(--surface);
+  color:var(--text);cursor:pointer;transition:all .15s;
+  outline:none;display:inline-flex;align-items:center;gap:6px;
+  white-space:nowrap;
+}
+.cselect-trigger:hover{border-color:var(--blue);color:var(--blue);}
+.cselect-trigger .chev{flex-shrink:0;color:var(--text3);transition:transform .2s;}
+.cselect.open .cselect-trigger{border-color:var(--blue);}
+.cselect.open .chev{transform:rotate(180deg);}
+.cselect-dropdown{
+  position:absolute;top:calc(100%+4px);left:0;z-index:200;
+  background:var(--surface);border:1.5px solid var(--border2);
+  border-radius:12px;box-shadow:0 6px 24px rgba(0,0,0,.12);
+  min-width:100%;overflow:hidden;display:none;
+}
+.cselect.open .cselect-dropdown{display:block;}
+.cselect-option{
+  padding:8px 16px;font-size:13px;font-weight:500;
+  cursor:pointer;transition:background .12s;white-space:nowrap;
+  color:var(--text);
+}
+.cselect-option:hover{background:var(--blue-l);color:var(--blue);}
+.cselect-option.sel{background:var(--blue);color:#fff;font-weight:600;}
+.cselect-option.sel:hover{background:#2d5ee8;color:#fff;}
 
 /* ── KPI GRID ── */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:20px;}
@@ -432,9 +463,25 @@ tbody tr:hover td{background:var(--blue-l);}
   }
 
   /* ── LOGIN OVERLAY ── */
-  #login-overlay{
-    position:fixed;inset:0;z-index:10000;
-    display:flex;align-items:center;justify-content:center;
+/* ── TOAST ── */
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:100000;padding:12px 24px;border-radius:10px;font-size:14px;font-weight:600;color:#fff;box-shadow:0 6px 24px rgba(0,0,0,.18);pointer-events:none;opacity:0;transition:opacity .3s ease,transform .3s ease;transform:translateX(-50%) translateY(10px);}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.toast.success{background:#0f9d58;}
+.toast.error{background:#d93025;}
+.toast.info{background:#1a73e8;}
+
+/* ── MODAL ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10002;display:flex;align-items:center;justify-content:center;}
+.modal-box{background:#fff;border-radius:12px;padding:24px 28px;width:380px;max-width:92vw;box-shadow:0 12px 40px rgba(0,0,0,.2);}
+.modal-box .fl{display:flex;flex-direction:column;gap:3px;}
+.modal-box .fl-lbl{font-size:12px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:.05em;}
+.modal-box .fl-inp{padding:8px 10px;border:1.5px solid #ddd;border-radius:6px;font-size:14px;font-family:var(--sans);outline:none;transition:border-color .15s;}
+.modal-box .fl-inp:focus{border-color:var(--blue);}
+.modal-box select.fl-inp{background:#fff;}
+
+#login-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:10000;
+  display:flex;align-items:center;justify-content:center;
     background:rgba(15,27,76,.75);
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   }
@@ -470,6 +517,7 @@ tbody tr:hover td{background:var(--blue-l);}
   .login-btn .spinner{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;}
   .login-btn.loading .spinner{display:inline-block;}
   .login-btn.loading .btn-text{display:none;}
+  .btn-spin{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite;display:inline-block;}
   @keyframes spin{to{transform:rotate(360deg)}}
   .pw-wrap{position:relative;}
   .pw-toggle{position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--text3);padding:4px;display:flex;align-items:center;transition:color .2s;}
@@ -496,6 +544,10 @@ tbody tr:hover td{background:var(--blue-l);}
     <button class="btn btn-ghost" id="usage-btn-u" onclick="downloadUsage()" style="display:none">
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg>
       <span>Usage</span>
+    </button>
+    <button class="btn btn-ghost" id="create-user-btn-u" onclick="showCreateUser()" style="display:none">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v12M2 8h12"/></svg>
+      <span>Create User</span>
     </button>
     <div class="user-badge-wrap" style="position:relative">
       <div class="user-badge" id="user-badge-upload" style="display:none" onclick="toggleUserMenu(event)">
@@ -679,6 +731,10 @@ function acceptCookies(){localStorage.setItem('orb_cookie_accepted','yes');docum
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg>
         <span>Usage</span>
       </button>
+      <button class="btn btn-ghost" id="create-user-btn" onclick="showCreateUser()" style="display:none">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v12M2 8h12"/></svg>
+        <span>Create User</span>
+      </button>
       <div class="user-badge-wrap" style="position:relative">
         <div class="user-badge" id="user-badge" onclick="toggleUserMenu(event)">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -774,7 +830,7 @@ function acceptCookies(){localStorage.setItem('orb_cookie_accepted','yes');docum
 <script>
 let allS=[], clsD=[], charts={}, sortDirs={}, studentRows=[], studentPool=[], classRows=[], uploadedFileName='orbclass-dashboard';
 
-// ── Firebase + Firestore ──
+// ── Firebase + Firestore + Auth ──
 const firebaseConfig = {
   apiKey: "AIzaSyDjaRktIKqqivCC3JbRCsQCHc2oDGUjz_8",
   authDomain: "orb-analytics-27c98.firebaseapp.com",
@@ -784,33 +840,75 @@ const firebaseConfig = {
   appId: "1:104445324539:web:7fc0f3160041754ab2d45e",
   measurementId: "G-V41W6T56TB"
 };
-let db=null;
+let db=null; let auth=null; let currentUser=null; let isAdmin=false;
 try{
   firebase.initializeApp(firebaseConfig);
   db=firebase.firestore();
-  console.log('Firestore connected');
+  auth=firebase.auth();
+  auth.useDeviceLanguage();
+  console.log('Firebase connected');
 }catch(e){console.error('Firebase init error',e);}
 
-// ── Login ──
-const ADMIN_USER='admin';
-const ADMIN_PASS='admin123';
-
-function checkLogin(){
-  if(localStorage.getItem('orb_logged_in')==='yes'){
-    document.getElementById('login-overlay').classList.add('hidden');
-    showUserBadge(localStorage.getItem('orb_user')||'User');
-  }else{
-    document.getElementById('login-overlay').classList.remove('hidden');
-    document.getElementById('login-err').textContent='';
+// ── Auth state ──
+function showLoggedIn(userData){
+  const displayName=userData.name||userData.username||userData.email.split('@')[0];
+  currentUser=userData;
+  isAdmin=userData.role==='admin';
+  // Create admin marker document for Firestore rule enforcement
+  if(isAdmin&&auth&&auth.currentUser){
+    db.collection('admins').doc(auth.currentUser.uid).set({role:'admin',email:userData.email||''}).catch(function(){});
   }
+  document.getElementById('login-overlay').classList.add('hidden');
+  document.getElementById('login-err').textContent='';
+  // Update badges
+  ['user-name-display','user-name-display-u'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el) el.textContent=displayName;
+  });
+  document.getElementById('user-badge-upload').style.display='';
+  // Admin-only controls
+  const showAdmin=isAdmin?'':'none';
+  ['usage-btn','usage-btn-u','create-user-btn','create-user-btn-u'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el) el.style.display=showAdmin;
+  });
+}
+
+function showLoggedOut(){
+  currentUser=null; isAdmin=false;
+  document.getElementById('login-overlay').classList.remove('hidden');
+  document.getElementById('login-err').textContent='';
+  document.getElementById('user-badge-upload').style.display='none';
+  ['usage-btn','usage-btn-u','create-user-btn','create-user-btn-u'].forEach(function(id){
+    const el=document.getElementById(id);
+    if(el) el.style.display='none';
+  });
+}
+
+// Auth state listener (persists session across refresh automatically)
+if(auth){
+  auth.onAuthStateChanged(async function(authUser){
+    if(authUser){
+      try{
+        const doc=await db.collection('users').doc(authUser.uid).get();
+        const data=doc.exists?doc.data():{};
+        data.email=data.email||authUser.email;
+        data.role=data.role||'user';
+        showLoggedIn(data);
+      }catch(e){
+        showLoggedIn({email:authUser.email,role:'user'});
+      }
+    }else{
+      showLoggedOut();
+    }
+  });
 }
 
 async function trackAction(action,meta){
-  if(!db) return;
+  if(!db||!currentUser) return;
   try{
-    const user=localStorage.getItem('orb_user')||'unknown';
     await db.collection('usage').add({
-      username:user,
+      username:currentUser.name||currentUser.email||'unknown',
       action:action,
       metadata:meta||'',
       timestamp:firebase.firestore.FieldValue.serverTimestamp()
@@ -828,41 +926,8 @@ function toggleUserMenu(e){
 document.addEventListener('click',function(){document.querySelectorAll('.user-menu').forEach(el=>el.classList.remove('open'));});
 
 function logout(){
-  localStorage.removeItem('orb_logged_in');
-  localStorage.removeItem('orb_user');
+  if(auth) auth.signOut();
   document.querySelectorAll('.user-menu').forEach(el=>el.classList.remove('open'));
-  document.getElementById('user-badge-upload').style.display='none';
-  location.reload();
-}
-
-function showUserBadge(name){
-  const d=document.getElementById('user-name-display');
-  const u=document.getElementById('user-name-display-u');
-  if(d) d.textContent=name;
-  if(u) u.textContent=name;
-  const ub=document.getElementById('user-badge-upload');
-  if(ub) ub.style.display='';
-  const ub2=document.getElementById('usage-btn');
-  if(ub2) ub2.style.display=localStorage.getItem('orb_user')==='admin'?'':'none';
-  const ub3=document.getElementById('usage-btn-u');
-  if(ub3) ub3.style.display=localStorage.getItem('orb_user')==='admin'?'':'none';
-}
-
-async function downloadUsage(){
-  if(!db){alert('Firestore not available.');return;}
-  try{
-    const snap=await db.collection('usage').orderBy('timestamp','desc').get();
-    const rows=[['Username','Action','Metadata','Timestamp']];
-    snap.forEach(doc=>{
-      const d=doc.data();
-      const ts=d.timestamp?new Date(d.timestamp.toMillis()).toLocaleString():'';
-      rows.push([d.username||'',d.action||'',d.metadata||'',ts]);
-    });
-    const wb=XLSX.utils.book_new();
-    const ws=XLSX.utils.aoa_to_sheet(rows);
-    XLSX.utils.book_append_sheet(wb,ws,'Usage');
-    XLSX.writeFile(wb,'usage-report.xlsx');
-  }catch(e){alert('Error downloading usage report.');console.error(e);}
 }
 
 function togglePass(){
@@ -883,41 +948,48 @@ async function doLogin(){
   const err=document.getElementById('login-err');
   if(!u||!p){err.textContent='Please enter username and password.';return;}
   btn.disabled=true;btn.classList.add('loading');err.textContent='';
-  // Check hardcoded admin first
-  if(u===ADMIN_USER&&p===ADMIN_PASS){
-    localStorage.setItem('orb_logged_in','yes');
-    localStorage.setItem('orb_user','admin');
-    showUserBadge('admin');
-    document.getElementById('login-overlay').classList.add('hidden');
-    btn.disabled=false;btn.classList.remove('loading');
-    ['usage-btn','usage-btn-u'].forEach(function(id){
-      const el=document.getElementById(id);
-      if(el) el.style.display='';
-    });
-    trackAction('login','admin');return;
-  }
-  // Check Firestore
-  if(!db){err.textContent='Firestore not available.';btn.disabled=false;btn.classList.remove('loading');return;}
   try{
-    const snap=await db.collection('users').where('username','==',u).get();
-    if(snap.empty){err.textContent='Invalid username or password.';document.getElementById('login-pass').value='';btn.disabled=false;btn.classList.remove('loading');return;}
-    let matchedDoc=null;
-    snap.forEach(doc=>{if(doc.data().password===p)matchedDoc=doc;});
-    if(matchedDoc){
-      const data=matchedDoc.data();
-      const displayName=data.name||data.username||u;
-      localStorage.setItem('orb_user',displayName);
-      showUserBadge(displayName);
-      localStorage.setItem('orb_logged_in','yes');
-      document.getElementById('login-overlay').classList.add('hidden');
-      err.textContent='';
-      trackAction('login',u);
-    }else{
+    const email=u.includes('@')?u:u+'@gmail.com';
+    console.log('Attempting login with email:', JSON.stringify(email));
+    await auth.signInWithEmailAndPassword(email,p);
+    btn.disabled=false;btn.classList.remove('loading');
+  }catch(e){
+    btn.disabled=false;btn.classList.remove('loading');
+    if(e.code==='auth/user-not-found'||e.code==='auth/wrong-password'||e.code==='auth/invalid-credential'||e.code==='auth/invalid-email'){
       err.textContent='Invalid username or password.';
-      document.getElementById('login-pass').value='';
+    }else if(e.code==='auth/too-many-requests'){
+      err.textContent='Too many attempts. Try again later.';
+    }else{
+      err.textContent='Login error ('+e.code+'). Check Firebase Auth is enabled.';
     }
-  }catch(e){err.textContent='Login error. Check Firestore connection.';console.error(e);}
-  btn.disabled=false;btn.classList.remove('loading');
+    document.getElementById('login-pass').value='';
+    console.error('Firebase login error:', e.code, e.message);
+  }
+}
+
+async function downloadUsage(){
+  if(!db){alert('Firestore not available.');return;}
+  const btns=['usage-btn','usage-btn-u'].map(function(id){
+    const el=document.getElementById(id);
+    if(el){el.disabled=true;el.innerHTML='<div class="btn-spin"></div><span>Downloading…</span>';}
+    return el;
+  });
+  try{
+    const snap=await db.collection('usage').orderBy('timestamp','desc').get();
+    const rows=[['Username','Action','Metadata','Timestamp']];
+    snap.forEach(doc=>{
+      const d=doc.data();
+      const ts=d.timestamp?new Date(d.timestamp.toMillis()).toLocaleString():'';
+      rows.push([d.username||'',d.action||'',d.metadata||'',ts]);
+    });
+    const wb=XLSX.utils.book_new();
+    const ws=XLSX.utils.aoa_to_sheet(rows);
+    XLSX.utils.book_append_sheet(wb,ws,'Usage');
+    XLSX.writeFile(wb,'usage-report.xlsx');
+  }catch(e){alert('Error downloading usage report.');console.error(e);}
+  btns.forEach(function(el){
+    if(el){el.disabled=false;el.innerHTML='<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10v3h10v-3M8 2v8M5 7l3 3 3-3"/></svg><span>Usage</span>';}
+  });
 }
 
 // ── Drop / upload ──
@@ -1080,6 +1152,43 @@ function fmt(n){return Number(n).toLocaleString();}
 let activeCampus='all';
 let topN=0;
 
+// Custom select (screen-share friendly — no native OS dropdown)
+function createCustomSelect(id, items, defaultVal, onChange){
+  const wrap=document.createElement('div');wrap.className='cselect';wrap.id=id;
+  const trigger=document.createElement('button');trigger.className='cselect-trigger';
+  trigger.type='button';
+  const label=document.createElement('span');label.textContent=items.find(i=>i.value===defaultVal)?.label||items[0]?.label||'';
+  trigger.appendChild(label);
+  trigger.innerHTML+='<svg class="chev" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="2 4 6 8 10 4"/></svg>';
+  const dd=document.createElement('div');dd.className='cselect-dropdown';
+  items.forEach(function(it){
+    const opt=document.createElement('div');opt.className='cselect-option'+(it.value===defaultVal?' sel':'');
+    opt.textContent=it.label;opt.dataset.value=it.value;
+    opt.onclick=function(){
+      dd.querySelectorAll('.cselect-option').forEach(function(o){o.classList.remove('sel');});
+      opt.classList.add('sel');
+      label.textContent=it.label;
+      wrap.classList.remove('open');
+      onChange(it.value);
+    };
+    dd.appendChild(opt);
+  });
+  wrap.appendChild(trigger);wrap.appendChild(dd);
+  trigger.onclick=function(e){e.stopPropagation();wrap.classList.toggle('open');};
+  document.addEventListener('click',function cl(e){if(!wrap.contains(e.target)){wrap.classList.remove('open');}});
+  return wrap;
+}
+function csVal(id){const el=document.getElementById(id);if(!el)return null;const sel=el.querySelector('.cselect-option.sel');return sel?sel.dataset.value:null;}
+function csSet(id,val){
+  const el=document.getElementById(id);if(!el)return;
+  el.querySelectorAll('.cselect-option').forEach(function(o){
+    o.classList.toggle('sel',o.dataset.value===val);
+  });
+  const lb=el.querySelector('.cselect-trigger span');
+  const match=el.querySelector('.cselect-option.sel');
+  if(lb&&match)lb.textContent=match.textContent;
+}
+
 function buildFilters(){
   const grades=[...new Set(clsD.map(c=>c.grade))].sort((a,b)=>+a-+b);
   const campuses=[...new Set(clsD.map(c=>c.campus).filter(Boolean))];
@@ -1089,17 +1198,10 @@ function buildFilters(){
   // ── Grade dropdown ──
   const gg=document.createElement('div');gg.className='filter-group';
   const gl=document.createElement('span');gl.className='filter-lbl';gl.textContent='Grade';
-  const gw=document.createElement('div');gw.className='fselect-wrap';
-  const gs=document.createElement('select');gs.className='fselect';gs.id='grade-select';
-  gs.innerHTML='<option value="all">All Grades</option>'+
-    grades.map(g=>`<option value="${g}">Grade ${g}</option>`).join('');
-  gs.onchange=()=>{
-    gs.classList.toggle('active',gs.value!=='all');
-    render(gs.value);
-  };
-  gw.innerHTML=`<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="2 4 6 8 10 4"/></svg>`;
-  gw.insertBefore(gs,gw.firstChild);
-  gg.appendChild(gl);gg.appendChild(gw);
+  const gs=createCustomSelect('grade-select',
+    [{value:'all',label:'All Grades'}].concat(grades.map(g=>({value:g,label:'Grade '+g}))),
+    'all',function(v){render(v);});
+  gg.appendChild(gl);gg.appendChild(gs);
   fb.appendChild(gg);
 
   // ── Campus dropdown (only if multiple) ──
@@ -1107,22 +1209,12 @@ function buildFilters(){
     const sep=document.createElement('span');
     sep.style.cssText='width:1px;height:22px;background:var(--border2);flex-shrink:0;';
     fb.appendChild(sep);
-
     const cg=document.createElement('div');cg.className='filter-group';
     const cl=document.createElement('span');cl.className='filter-lbl';cl.textContent='Campus';
-    const cw=document.createElement('div');cw.className='fselect-wrap';
-    const cs=document.createElement('select');cs.className='fselect';cs.id='campus-select';
-    cs.innerHTML='<option value="all">All Campuses</option>'+
-      campuses.map(cp=>`<option value="${cp}">${cp}</option>`).join('');
-    cs.onchange=()=>{
-      activeCampus=cs.value;
-      cs.classList.toggle('active',cs.value!=='all');
-      const gv=document.getElementById('grade-select')?.value||'all';
-      render(gv);
-    };
-    cw.innerHTML=`<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="2 4 6 8 10 4"/></svg>`;
-    cw.insertBefore(cs,cw.firstChild);
-    cg.appendChild(cl);cg.appendChild(cw);
+    const cs=createCustomSelect('campus-select',
+      [{value:'all',label:'All Campuses'}].concat(campuses.map(c=>({value:c,label:c}))),
+      'all',function(v){activeCampus=v;render(csVal('grade-select')||'all');});
+    cg.appendChild(cl);cg.appendChild(cs);
     fb.appendChild(cg);
   } else {
     activeCampus='all';
@@ -1134,23 +1226,19 @@ function buildFilters(){
   fb.appendChild(sep2);
   const topWrap=document.createElement('span');
   topWrap.style.cssText='display:inline-flex;align-items:center;gap:4px;';
-  const topSel=document.createElement('select');topSel.id='top-n-sel';
-  topSel.style.cssText='font-family:var(--sans);font-size:12px;font-weight:600;padding:5px 22px 5px 10px;border-radius:20px;border:1.5px solid var(--border2);background:var(--surface);color:var(--text2);cursor:pointer;outline:none;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'10\' viewBox=\'0 0 16 16\'%3E%3Cpolyline points=\'4 6 8 10 12 6\' fill=\'none\' stroke=\'%238890a8\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 6px center;';
-  const offOpt=document.createElement('option');offOpt.value='0';offOpt.selected=true;offOpt.textContent='Select Top Students';topSel.appendChild(offOpt);
-  [10,20,30,40,50].forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent='Top '+n;topSel.appendChild(o);});
-  const oc=document.createElement('option');oc.value='custom';oc.textContent='Custom…';topSel.appendChild(oc);
-  topSel.value='0';
-  topSel.onchange=()=>{
-    const v=topSel.value;
-    if(v==='custom'){topCustom.style.display='';topCustom.focus();return;}
-    topCustom.style.display='none';
-    topN=+v;render(document.getElementById('grade-select')?.value||'all');
-  };
+  const topGs=createCustomSelect('top-n-sel',
+    [{value:'0',label:'Select Top Students'},{value:'10',label:'Top 10'},{value:'20',label:'Top 20'},{value:'30',label:'Top 30'},{value:'40',label:'Top 40'},{value:'50',label:'Top 50'},{value:'custom',label:'Custom…'}],
+    '0',function(v){
+      if(v==='custom'){topCustom.style.display='';topCustom.focus();return;}
+      topCustom.style.display='none';
+      topN=+v;render(csVal('grade-select')||'all');
+    });
+  topWrap.appendChild(topGs);
   const topCustom=document.createElement('input');topCustom.id='top-n-custom';topCustom.type='number';topCustom.min=1;topCustom.max=999;topCustom.placeholder='N';
   topCustom.style.cssText='width:48px;font-family:var(--sans);font-size:12px;font-weight:600;padding:5px 8px;border-radius:20px;border:1.5px solid var(--blue);background:var(--surface);color:var(--text);outline:none;display:none;text-align:center;';
-  topCustom.onkeydown=e=>{if(e.key==='Enter'){const v=parseInt(topCustom.value);if(v>0){topN=v;render(document.getElementById('grade-select')?.value||'all');}}};
-  topCustom.onblur=()=>{const v=parseInt(topCustom.value);if(v>0){topN=v;render(document.getElementById('grade-select')?.value||'all');}};
-  topWrap.appendChild(topSel);topWrap.appendChild(topCustom);
+  topCustom.onkeydown=e=>{if(e.key==='Enter'){const v=parseInt(topCustom.value);if(v>0){topN=v;render(csVal('grade-select')||'all');}}};
+  topCustom.onblur=()=>{const v=parseInt(topCustom.value);if(v>0){topN=v;render(csVal('grade-select')||'all');}};
+  topWrap.appendChild(topCustom);
   fb.appendChild(topWrap);
 }
 
@@ -1162,7 +1250,7 @@ function render(grade){
   let fs=activeCampus==='all'?byGradeS:byGradeS.filter(s=>s.campus===activeCampus);
   let top10Classes=[];
   document.getElementById('top-n-sel').classList.toggle('active',topN>0);
-  document.getElementById('top-n-custom').classList.toggle('active',topN>0&&document.getElementById('top-n-sel').value==='custom');
+  document.getElementById('top-n-custom').classList.toggle('active',topN>0&&csVal('top-n-sel')==='custom');
   if(topN>0){
     const fsScore=[...fs].filter(s=>s.score>0).sort((a,b)=>b.score-a.score||b.logins-a.logins);
     const fsNoScore=[...fs].filter(s=>s.score===0).sort((a,b)=>b.logins-a.logins);
@@ -1638,8 +1726,7 @@ async function exportPDF(mode){
   ov.style.display='flex';
   msg.textContent='Preparing PDF…';
 
-  const gs0=document.getElementById('grade-select');
-  const currentGrade=gs0?gs0.value:'all';
+  const currentGrade=csVal('grade-select')||'all';
   const grade=currentGrade==='All'?'all':currentGrade;
 
   try{
@@ -1664,8 +1751,8 @@ async function exportPDF(mode){
       document.querySelector('#status-filters .status-pill[data-status="all"]')?.classList.remove('active');
       filterStudents();
     }
-    const gs=document.getElementById('grade-select');
-    if(gs) gs.value=grade;
+    const gs=csVal('grade-select');
+    if(gs) csSet('grade-select',grade);
 
     msg.textContent='Finalising…';
     const pages=pdf.internal.getNumberOfPages();
@@ -1699,7 +1786,7 @@ function vis(id){
 function resetTool(){
   allS=[];clsD=[];pendingFiles=[];activeCampus='all';topN=0;
   const topSel=document.getElementById('top-n-sel');
-  if(topSel){topSel.value='0';topSel.classList.remove('active');}
+  if(topSel){csSet('top-n-sel','0');topSel.classList.remove('active');}
   document.getElementById('top-n-custom').style.display='none';
   Object.values(charts).forEach(c=>c.destroy());charts={};
   document.getElementById('file-input').value='';
@@ -1707,7 +1794,79 @@ function resetTool(){
   vis('upload-screen');
 }
 
-document.addEventListener('DOMContentLoaded',()=>{checkLogin();});
+// ── Toast notification ──
+function showToast(msg,type){
+  const el=document.getElementById('toast');
+  el.textContent=msg;
+  el.className='toast '+(type||'info');
+  requestAnimationFrame(function(){el.classList.add('show');});
+  clearTimeout(el._t);
+  el._t=setTimeout(function(){el.classList.remove('show');},3000);
+}
+
+// ── Admin: Create User ──
+async function showCreateUser(){
+  const m=document.getElementById('create-user-modal');
+  if(m) m.style.display='flex';
+}
+function hideCreateUser(){
+  const m=document.getElementById('create-user-modal');
+  if(m) m.style.display='none';
+}
+async function submitCreateUser(){
+  const uid=document.getElementById('cu-uid').value.trim();
+  const email=document.getElementById('cu-email').value.trim();
+  const username=document.getElementById('cu-username').value.trim();
+  const name=document.getElementById('cu-name').value.trim();
+  const role=document.getElementById('cu-role').value;
+  if(!uid||!username){showToast('UID and username are required.','error');return;}
+  const btn=document.getElementById('cu-submit');
+  btn.disabled=true;btn.textContent='Creating…';
+  try{
+    await db.collection('users').doc(uid).set({username,name,role,email});
+    // Create admin marker if this user has admin role
+    if(role==='admin'){
+      await db.collection('admins').doc(uid).set({role:'admin',email});
+    }
+    showToast('Profile created for '+username,'success');
+    hideCreateUser();
+    document.getElementById('cu-uid').value='';
+    document.getElementById('cu-email').value='';
+    document.getElementById('cu-username').value='';
+    document.getElementById('cu-name').value='';
+    document.getElementById('cu-role').value='user';
+  }catch(e){
+    showToast('Error: '+e.message,'error');
+    console.error('Create profile error:',e);
+  }
+  btn.disabled=false;btn.textContent='Create Profile';
+}
+
+document.addEventListener('DOMContentLoaded',function(){
+  // onAuthStateChanged handles session persistence automatically
+});
 </script>
+
+<!-- Create User Modal (admin only) -->
+<div id="create-user-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)hideCreateUser()">
+  <div class="modal-box">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-size:15px;font-weight:700">Link Firestore Profile</div>
+      <button onclick="hideCreateUser()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#888;line-height:1">&times;</button>
+    </div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;line-height:1.5">First, add the user in <b>Firebase Console → Authentication → Users → Add User</b>. Then paste the UID below.</div>
+    <div class="fl" style="margin-bottom:10px"><label class="fl-lbl">Firebase Auth UID *</label><input class="fl-inp" id="cu-uid" placeholder="Paste UID from Firebase Console"></div>
+    <div class="fl" style="margin-bottom:10px"><label class="fl-lbl">Email</label><input class="fl-inp" id="cu-email" type="email" placeholder="user@example.com"></div>
+    <div class="fl" style="margin-bottom:10px"><label class="fl-lbl">Username *</label><input class="fl-inp" id="cu-username" placeholder="e.g. orb.southafrica"></div>
+    <div class="fl" style="margin-bottom:10px"><label class="fl-lbl">Display Name</label><input class="fl-inp" id="cu-name" placeholder="e.g. South Africa"></div>
+    <div class="fl" style="margin-bottom:16px">
+      <label class="fl-lbl">Role</label>
+      <select class="fl-inp" id="cu-role"><option value="user">User</option><option value="admin">Admin</option></select>
+    </div>
+    <button id="cu-submit" class="btn btn-pdf" style="width:100%;justify-content:center" onclick="submitCreateUser()">Create Profile</button>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
 </body>
 </html>
